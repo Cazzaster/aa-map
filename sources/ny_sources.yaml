@@ -1,0 +1,148 @@
+# NY State AA meeting source registry — aa-map pilot.
+#
+# Researched 2026-09-05 by directly fetching each candidate feed endpoint
+# (not guessed from search results alone). All AA meeting-list sites are
+# independent — there is no single statewide or national feed — so each
+# entry here is one Area/Intergroup/Central Office's own meeting-finder site.
+#
+# Feed discovery method: most of these run the TSML ("12 Step Meeting List")
+# WordPress plugin. Its actual REST route is `/wp-json/tsml/meetings`
+# (NOT `/wp-json/tsml/v1/meetings`, which is a commonly-assumed but wrong
+# guess — it 404s everywhere). Confirm any new source the same way:
+#   curl -s <site>/wp-json/tsml/meetings | wc -c   (should return a JSON array)
+#
+# SUMMARY (as of this research pass):
+#   9 entities registered
+#   7 verified working feeds  (NYC, Queens, Nassau, Suffolk, Albany,
+#                               Syracuse, Jefferson County/North Country)
+#     ~6,369 meetings reachable across those 7 feeds combined
+#   2 feeds exist but are access-restricted by the site owner
+#     (Buffalo, Rockland) — see notes; do not attempt to bypass this,
+#     it's a deliberate choice by the intergroup, not a bug.
+#   Still needing manual follow-up / not yet found:
+#     Rochester/Genesee region (likely TSML, blocked by a WAF from
+#       automated fetches — try again with a real browser session, or
+#       email the intergroup to ask about API/feed access)
+#     Westchester (no discoverable feed at the obvious path)
+#     Southern Tier: Binghamton, Elmira (small sites, no TSML/BMLT found;
+#       likely need custom HTML scraping or a direct ask for a data export)
+#   No BMLT-based AA source was found for NY in this pass — BMLT is far
+#   more common for NA than AA; none of the sites checked use it.
+
+sources:
+  - id: ny_intergroup_nyc
+    name: "New York Intergroup Association"
+    region: "New York City (five boroughs) and surrounding area"
+    website: "https://www.nyintergroup.org/"
+    feed_type: tsml
+    feed_url: "https://www.nyintergroup.org/wp-json/tsml/meetings"
+    verified: true
+    notes: "Confirmed 200 OK, 2878 meetings returned. By far the largest single NY source. May have some overlap with queens_aa below since NYC borders Queens — dedupe strategy TBD in build_dataset.py (e.g. by matching name+address+day+time)."
+
+  - id: queens_aa
+    name: "Queens AA"
+    region: "Queens, NYC"
+    website: "https://queensaa.org/"
+    feed_type: tsml
+    feed_url: "https://queensaa.org/wp-json/tsml/meetings"
+    verified: true
+    notes: "Confirmed 200 OK, 330 meetings returned. Possible overlap with ny_intergroup_nyc — check for duplicate meetings across both feeds during build."
+
+  - id: nassau_intergroup
+    name: "Nassau Intergroup of A.A."
+    region: "Nassau County, Long Island"
+    website: "https://nassauintergroup.org/"
+    feed_type: tsml
+    feed_url: "https://nassauintergroup.org/wp-json/tsml/meetings"
+    verified: true
+    notes: "Confirmed 200 OK, 644 meetings returned."
+
+  - id: suffolk_intergroup
+    name: "Suffolk Intergroup Association of A.A."
+    region: "Suffolk County, Long Island"
+    website: "https://suffolkny-aa.org/"
+    feed_type: tsml
+    feed_url: "https://suffolkny-aa.org/wp-json/tsml/meetings"
+    verified: true
+    notes: "Confirmed 200 OK, 890 meetings returned."
+
+  - id: capital_district_central_office
+    name: "Capital District Central Office (CDCO)"
+    region: "Albany, Schenectady, Rensselaer, Columbia, Essex, Hamilton, Saratoga, Warren, Washington counties"
+    website: "https://aaalbanyny.org/"
+    feed_type: tsml
+    feed_url: "https://aaalbanyny.org/wp-json/tsml/meetings"
+    verified: true
+    notes: "Confirmed 200 OK, 1179 meetings returned."
+
+  - id: syracuse_intergroup
+    name: "Syracuse AA Intergroup"
+    region: "Syracuse / Central New York"
+    website: "https://www.aasyracuse.org/"
+    feed_type: tsml
+    feed_url: "https://www.aasyracuse.org/wp-json/tsml/meetings"
+    verified: true
+    notes: "Confirmed 200 OK, 399 meetings returned."
+
+  - id: jefferson_county_intergroup
+    name: "Jefferson County Intergroup"
+    region: "Watertown / North Country (Jefferson County)"
+    website: "https://aajci.org/"
+    feed_type: tsml
+    feed_url: "https://aajci.org/wp-json/tsml/meetings"
+    verified: true
+    notes: "Confirmed 200 OK, 49 meetings returned. Smallest verified feed — North Country is sparsely covered; other North Country towns (Plattsburgh, Massena, Saranac Lake) not yet matched to a source."
+
+  - id: buffalo_area_central_office
+    name: "Buffalo Area AA Central Office"
+    region: "Buffalo / Western New York"
+    website: "https://buffaloaany.org/"
+    feed_type: none_found
+    feed_url: null
+    verified: false
+    notes: "Runs TSML (confirmed via /wp-json/ route listing) but the feed endpoint returns HTTP 403 {\"code\":\"feed_restricted\"} — the site owner has deliberately disabled public API access. Do not attempt to bypass. Would need to email buffaloaa@hotmail.com to ask about data access/inclusion, or fall back to manual/consented scraping of the public meetings page if they're open to it."
+
+  - id: rockland_county_aa
+    name: "Alcoholics Anonymous of Rockland County"
+    region: "Rockland County (Hudson Valley)"
+    website: "https://rocklandnyaa.org/"
+    feed_type: none_found
+    feed_url: null
+    verified: false
+    notes: "Same situation as Buffalo — TSML installed but feed explicitly restricted (403 feed_restricted). Respect this; contact the intergroup directly if we want inclusion."
+
+  - id: rochester_area_intergroup
+    name: "Rochester Area Intergroup"
+    region: "Genesee, Livingston, Monroe, Ontario, Orleans, Wayne, Wyoming counties"
+    website: "https://rochesteraa.org/"
+    feed_type: none_found
+    feed_url: null
+    verified: false
+    notes: "Meeting finder lives at meetings.rochesteraa.org (URL pattern ?post_type=tsml_meeting strongly suggests TSML), but automated requests to that subdomain are blocked by a ModSecurity WAF rule (got a 406/404 depending on headers, never real JSON). Main rochesteraa.org is on Squarespace and has no feed itself. Needs either a real browser session to probe further, or a direct ask to the intergroup for feed/API access."
+
+  - id: westchester_aa
+    name: "Westchester AA (Westchester General Service Assembly)"
+    region: "Westchester County (Hudson Valley)"
+    website: "https://www.westchesternyaa.org/"
+    feed_type: none_found
+    feed_url: null
+    verified: false
+    notes: "No TSML/Meeting Guide feed found at the standard path (redirects to homepage, so likely not running TSML at all, or it's on a different path/CMS). Needs manual investigation of the site's actual meeting-finder implementation."
+
+  - id: binghamton_intergroup
+    name: "AA Binghamton (Triple Cities Intergroup)"
+    region: "Binghamton / Southern Tier (east)"
+    website: "https://aabinghamton.org/"
+    feed_type: none_found
+    feed_url: null
+    verified: false
+    notes: "No TSML feed found; site appears to be a small custom/static site (meetings.php page). Would need custom HTML scraping or a direct data request — deprioritize until the verified sources are working end-to-end."
+
+  - id: elmira_intergroup
+    name: "Elmira Intergroup"
+    region: "Elmira / Southern Tier (west)"
+    website: "https://www.aaelmira.org/"
+    feed_type: none_found
+    feed_url: null
+    verified: false
+    notes: "Same situation as Binghamton — small site, no discoverable feed. Backlog item."

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NY AA Meeting Finder</title>
+  <link href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h1>AA Meeting Finder</h1>
+      <p class="subtitle">New York State &middot; free &amp; anonymous, no sign-up</p>
+    </div>
+
+    <div id="search-panel">
+      <label for="location-input">Your location</label>
+      <div class="input-row">
+        <input id="location-input" type="text" placeholder="Address or ZIP code" />
+        <button id="use-location-btn" title="Use my current location">📍</button>
+      </div>
+      <button id="search-btn">Find meetings near me</button>
+
+      <label for="radius-select">Within</label>
+      <select id="radius-select">
+        <option value="1">1 mile</option>
+        <option value="5" selected>5 miles</option>
+        <option value="10">10 miles</option>
+        <option value="25">25 miles</option>
+        <option value="50">50 miles</option>
+      </select>
+
+      <label for="when-select">When</label>
+      <select id="when-select">
+        <option value="any">Any day/time</option>
+        <option value="today" selected>Today</option>
+        <option value="upcoming-today">Today, starting from now</option>
+        <option value="week">This week</option>
+      </select>
+
+      <p id="status-line"></p>
+    </div>
+
+    <div id="results-panel">
+      <ol id="results-list"></ol>
+    </div>
+
+    <div id="sidebar-footer">
+      <p>
+        Data aggregated nightly from public AA Intergroup/Area meeting feeds.
+        Not affiliated with or endorsed by A.A. World Services.
+        Meeting info may change — always confirm with the host Intergroup for anything time-sensitive.
+      </p>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
