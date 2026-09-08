@@ -113,8 +113,13 @@ the map against freshly built data.
 
 ## Known limitations / next steps
 
-- **Geographic scope**: NY State pilot only. Nationwide expansion means
-  growing `sources/*.yaml` per state and is the natural next phase.
+- **Geographic scope**: NY State pilot only, but the pilot is done and
+  live — **nationwide expansion is the active next phase** (see
+  `STATUS.md`). Growing coverage means researching each new state's
+  Area/Intergroup feeds the same way `sources/ny_sources.yaml` was built
+  (most run the same TSML WordPress plugin), then deciding whether the
+  registry becomes one YAML per state or a single file with a `state`
+  field per source.
 - **Program scope**: AA only for now. Adding NA/other 12-step programs later
   is straightforward since BMLT sources often carry both — tracked as a
   follow-up, not done here to keep the initial product focused.
