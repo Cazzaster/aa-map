@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
+from .sanitize import sanitize_notes
 from .schema import Meeting
 
 # Meeting Guide spec sometimes uses "day" as a 0-6 int already matching our
@@ -58,7 +59,7 @@ def _parse_time(raw: str | None) -> str | None:
             return datetime.strptime(raw, fmt).strftime("%H:%M")
         except ValueError:
             continue
-    return raw  # last resort: pass through as-is rather than dropping data
+    return None  # unparseable — treat as unscheduled rather than showing garbage
 
 
 def parse(raw_meetings: list[dict], source_id: str) -> list[Meeting]:
@@ -75,7 +76,7 @@ def parse(raw_meetings: list[dict], source_id: str) -> list[Meeting]:
         lat = m.get("latitude")
         lon = m.get("longitude")
 
-        notes = m.get("notes")
+        notes = sanitize_notes(m.get("notes"))
         # Strip any contact-person fields the upstream feed may include —
         # never republish who runs a meeting, only meeting logistics.
         for f in _CONTACT_FIELDS:

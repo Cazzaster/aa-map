@@ -29,33 +29,96 @@ a static MapLibre frontend reads directly.
 - [x] Nightly GitHub Actions rebuild (`.github/workflows/update-meetings.yml`)
 - [x] Pushed to GitHub (private repo, initial commit `d29ba80`)
 - [x] Functionality code review completed (high effort) — 6 findings,
-      **none fixed yet** (see below)
+      **all 6 fixed this session** (see below), verified with a real
+      build run and a live browser check (50-mile NYC search)
 
-## Open findings from code review — not yet fixed
+## Code review findings — all fixed
 
-Ranked most-severe first:
+1. **`scripts/geocode.py`** — response parsing (Census + Nominatim) now
+   lives inside the try/except, with `KeyError`/`IndexError`/`TypeError`
+   added so a malformed response can no longer crash the nightly build.
+2. **`scripts/geocode.py`** — failed geocode lookups are no longer cached;
+   they're retried on every build instead of being silently and
+   permanently dropped from the map after one transient API hiccup.
+3. **`docs/app.js`** — `loadMeetings()` now wraps the fetch in try/catch
+   and shows an error status instead of hanging forever on "Loading
+   meeting data…".
+4. **`docs/app.js`** — map markers are capped at `MAX_MAP_MARKERS` (300);
+   the status line tells the user when results were truncated on the map
+   (results list itself still shows everything). Verified live: a 50-mile
+   NYC search returned 429 meetings and showed "Showing the nearest 300
+   on the map — narrow your search to see the rest there too."
+5. **`scripts/normalize/meeting_guide_json.py`** — an unparseable time
+   string now becomes `None` (renders as "Time varies") instead of
+   passing through and showing "NaN:NaN AM".
+6. **`scripts/build_dataset.py`** — added `dedup_meetings()`, keyed on
+   normalized name+address+day+time. A real build run removed 126
+   duplicates between the NYC and Queens feeds (4,709 → 4,583 meetings
+   written to `docs/data/meetings.geojson`).
 
-1. **`scripts/geocode.py:53`** — geocoder response parsing sits outside the
-   try/except; a malformed Census/Nominatim response can crash the entire
-   nightly build silently (no `meetings.geojson` written, no visible error).
-2. **`scripts/geocode.py:93`** — a failed geocode lookup is cached as `None`
-   forever with no retry — one transient API hiccup permanently and
-   silently drops that meeting from the map.
-3. **`docs/app.js:49`** — `loadMeetings()` has no error handling; a
-   failed/missing data fetch leaves the UI stuck on "Loading meeting
-   data…" forever. (This is hit exactly as described if you preview
-   `docs/index.html` before ever running the build script — worth fixing
-   before anyone else tries the README's own local-preview steps.)
-4. **`docs/app.js:220`** — no cap on rendered markers; a 50-mile search
-   near NYC could render thousands of DOM markers/popups in one tick and
-   freeze the tab. Known tradeoff from switching to pushpins over
-   clustering — a result cap would be a cheap safety valve.
-5. **`scripts/normalize/meeting_guide_json.py:61`** — an unparseable time
-   string passes through as-is instead of becoming `None`, so the UI can
-   show a garbled "NaN:NaN AM" instead of the intended "Time varies" text.
-6. **`sources/ny_sources.yaml`** — no dedup between overlapping NYC/Queens
-   feeds; a meeting near that border can show up twice. Already flagged as
-   a TODO in the registry's own notes, not yet implemented.
+## Privacy audit — personal info found and scrubbed
+
+A repo-wide check for API keys/secrets found none. But the free-text
+`notes` field (unlike the dedicated contact fields, which were already
+stripped) was passing upstream feed text through verbatim, and it
+contained real personal info already committed in `d29ba80`: a named
+individual's personal cell phone number (City Island Beach Group, NYC
+feed), a personal PayPal handle tied to a first name + last initial, and
+a Zelle email/account number (Capital District and Queens feeds).
+
+Fixed with a new `scripts/normalize/sanitize.py::sanitize_notes()`,
+wired into both `meeting_guide_json.py` and `bmlt.py`: drops any sentence
+mentioning Venmo/Zelle/PayPal/CashApp/Apple Pay, drops any sentence that
+pairs a call/text/contact verb with a phone number, redacts bare email
+addresses, and — belt-and-suspenders per your request — redacts *any*
+remaining phone-shaped number in a note unless the note is clearly about
+remote-meeting access (Zoom/Webex/dial-in/passcode/etc., needed to
+actually join a hybrid meeting). Rebuilt the dataset and verified by
+scanning every note for phone/email/payment patterns: zero personal
+matches remain; all ~105 remaining phone-shaped strings are confirmed
+Zoom/meeting-ID logistics.
+
+**Git history rewrite:** the original personal info was already committed
+in `d29ba80`. Since the repo had only 2 commits and your partner had just
+accepted the collaboration invite, we rewrote history (via
+`git filter-branch` with a tree-filter running the same scrub logic) to
+remove it retroactively, then force-pushed. Old commit hashes
+`d29ba80`/`1bcd658` no longer exist on `main`; the equivalent clean
+commits are new hashes. **Your partner needs to re-clone the repo (or
+`git fetch && git reset --hard origin/main`)** rather than pull, since
+this was a forced history rewrite.
+
+## Test suite + additional improvements (this session)
+
+Went through the post-review improvement list and knocked out the quick,
+safe ones:
+
+- **Tests** (`tests/`, new): 16 unit tests (stdlib `unittest`, no new
+  dependency) covering the notes sanitizer, cross-feed dedup, and the
+  TSML/Meeting Guide time parser + attendance filtering. Wired into a new
+  `.github/workflows/tests.yml` so every push/PR runs them.
+- **Results list capped** (`docs/app.js`): a pathological huge-radius
+  query now caps the sidebar list at `MAX_LIST_RESULTS` (1000), same idea
+  as the earlier map-marker cap but a higher ceiling since list items are
+  far cheaper to render than map markers.
+- **Instant search feedback** (`docs/app.js`): `runSearch()` now sets
+  "Searching…" immediately instead of only showing status once geocoding
+  finishes.
+- **By-appointment meetings surfaced** (`docs/app.js`): "Today"/"Today,
+  starting from now" filters exclude meetings with no fixed day/time by
+  design (nothing to compare against), but that used to look
+  indistinguishable from "no meetings nearby." The status line now says
+  e.g. "3 by-appointment meeting(s) nearby not shown — search 'Any time'
+  to see them."
+
+Not done (need more time/research or your decision, not code changes):
+Rochester/Westchester/Binghamton/Elmira feed research, emailing
+Buffalo/Rockland intergroups, and nightly-build failure monitoring
+(GitHub already emails repo owners on failed Actions runs by default, so
+this is likely a non-issue as long as those notifications are on).
+
+All of the above, plus the 6 code-review fixes and the privacy fixes, are
+committed and pushed to `main`.
 
 ## Key decisions made this session
 
@@ -71,7 +134,10 @@ Ranked most-severe first:
 
 ## Next steps — pick up here
 
-- [ ] Decide which of the 6 code review findings to fix (all, or a subset)
+- [x] Fix the 6 code review findings — done, committed, pushed
+- [x] Privacy audit: scrub personal info from notes field + rewrite git
+      history to remove it retroactively — done, committed, pushed
+- [x] Tests + a few frontend UX improvements — done, committed, pushed
 - [ ] Flip repo to public + enable GitHub Pages (`main:/docs`) once ready
       — I can do this via the GitHub API once told to proceed
 - [ ] Chase down remaining NY regions: Rochester, Westchester, Binghamton,

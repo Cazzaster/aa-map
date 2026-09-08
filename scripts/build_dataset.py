@@ -44,6 +44,29 @@ def fetch_feed(url: str) -> list[dict]:
     return data
 
 
+def _dedup_key(m) -> tuple:
+    """Identity for a meeting independent of which source feed reported it.
+
+    Overlapping regions (e.g. NYC/Queens border) can have the same physical
+    meeting listed in two intergroups' feeds. Normalize name/address so
+    whitespace/case differences between feeds don't defeat the match.
+    """
+    norm = lambda s: " ".join((s or "").split()).lower()
+    return (norm(m.name), norm(m.address), m.day, m.time)
+
+
+def dedup_meetings(meetings: list) -> list:
+    seen = set()
+    out = []
+    for m in meetings:
+        key = _dedup_key(m)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(m)
+    return out
+
+
 def main() -> None:
     sources = load_sources()
     all_meetings = []
@@ -68,7 +91,9 @@ def main() -> None:
         all_meetings.extend(meetings)
         print(f"  {src['id']}: {len(meetings)} meetings")
 
-    print(f"\nTotal meetings before geocoding: {len(all_meetings)}")
+    before_dedup = len(all_meetings)
+    all_meetings = dedup_meetings(all_meetings)
+    print(f"\nTotal meetings: {before_dedup} ({before_dedup - len(all_meetings)} duplicate(s) removed across overlapping feeds)")
     geocode_missing(all_meetings)
 
     features = [m.to_geojson_feature() for m in all_meetings]

@@ -37,7 +37,7 @@ sources:
     feed_type: tsml
     feed_url: "https://www.nyintergroup.org/wp-json/tsml/meetings"
     verified: true
-    notes: "Confirmed 200 OK, 2878 meetings returned. By far the largest single NY source. May have some overlap with queens_aa below since NYC borders Queens — dedupe strategy TBD in build_dataset.py (e.g. by matching name+address+day+time)."
+    notes: "Confirmed 200 OK, 2878 meetings returned. By far the largest single NY source. Overlaps with queens_aa below since NYC borders Queens — deduped in build_dataset.py by matching normalized name+address+day+time."
 
   - id: queens_aa
     name: "Queens AA"
@@ -46,7 +46,7 @@ sources:
     feed_type: tsml
     feed_url: "https://queensaa.org/wp-json/tsml/meetings"
     verified: true
-    notes: "Confirmed 200 OK, 330 meetings returned. Possible overlap with ny_intergroup_nyc — check for duplicate meetings across both feeds during build."
+    notes: "Confirmed 200 OK, 330 meetings returned. Overlaps with ny_intergroup_nyc — deduped in build_dataset.py (see that entry's notes)."
 
   - id: nassau_intergroup
     name: "Nassau Intergroup of A.A."

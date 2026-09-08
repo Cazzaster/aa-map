@@ -8,8 +8,11 @@ Census geocoder can't match, and rate-limited to 1 req/sec per its usage
 policy. This is a nightly batch job over a few dozen misses, not live
 per-visitor traffic, so both services' terms are respected.
 
-Results are cached on disk (data/geocode_cache.json) keyed by the exact
-address string, so re-running the build never re-geocodes the same address.
+Successful results are cached on disk (data/geocode_cache.json) keyed by
+the exact address string, so re-running the build never re-geocodes the
+same address. Failed lookups are NOT cached, so a transient API hiccup
+gets retried on the next build instead of permanently dropping that
+meeting from the map.
 """
 
 from __future__ import annotations
@@ -46,12 +49,12 @@ def _census_lookup(address: str) -> tuple[float, float] | None:
         )
         r.raise_for_status()
         matches = r.json().get("result", {}).get("addressMatches", [])
-    except (requests.RequestException, ValueError):
+        if not matches:
+            return None
+        coords = matches[0]["coordinates"]
+        return float(coords["y"]), float(coords["x"])  # (lat, lon)
+    except (requests.RequestException, ValueError, KeyError, TypeError, IndexError):
         return None
-    if not matches:
-        return None
-    coords = matches[0]["coordinates"]
-    return float(coords["y"]), float(coords["x"])  # (lat, lon)
 
 
 def _nominatim_lookup(address: str) -> tuple[float, float] | None:
@@ -64,11 +67,11 @@ def _nominatim_lookup(address: str) -> tuple[float, float] | None:
         )
         r.raise_for_status()
         data = r.json()
-    except (requests.RequestException, ValueError):
+        if not data:
+            return None
+        return float(data[0]["lat"]), float(data[0]["lon"])
+    except (requests.RequestException, ValueError, KeyError, TypeError, IndexError):
         return None
-    if not data:
-        return None
-    return float(data[0]["lat"]), float(data[0]["lon"])
 
 
 def geocode_missing(meetings: list) -> None:
@@ -84,21 +87,20 @@ def geocode_missing(meetings: list) -> None:
             continue
 
         if address in cache:
-            cached = cache[address]
-            lat, lon = cached if cached is not None else (None, None)
+            lat, lon = cache[address]
         else:
             hit = _census_lookup(address) or _nominatim_lookup(address)
             time.sleep(1)  # respect Nominatim's 1 req/sec policy even on Census hits
             if hit is None:
-                cache[address] = None
-                dirty = True
+                # Don't cache failures: a transient API hiccup would otherwise
+                # drop this meeting from the map forever. Retry every build
+                # instead — it's only a few dozen misses in a nightly job.
                 continue
             lat, lon = hit
             cache[address] = [lat, lon]
             dirty = True
 
-        if lat is not None and lon is not None:
-            m.latitude, m.longitude = lat, lon
+        m.latitude, m.longitude = lat, lon
 
     if dirty:
         _save_cache(cache)

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from .sanitize import sanitize_notes
 from .schema import Meeting
 
 _CONTACT_FIELDS = {
@@ -60,7 +61,7 @@ def parse(raw_meetings: list[dict], source_id: str) -> list[Meeting]:
             postal_code=m.get("location_postal_code_1"),
             latitude=float(lat) if lat not in (None, "") else None,
             longitude=float(lon) if lon not in (None, "") else None,
-            notes=m.get("comments"),
+            notes=sanitize_notes(m.get("comments")),
             last_updated=today,
         ))
     return out

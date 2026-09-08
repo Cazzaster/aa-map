@@ -3,6 +3,13 @@ const DATA_URL = "data/meetings.geojson";
 const MAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+// Rendering more than this many pins/popups in one tick can freeze the tab
+// (e.g. a 50-mile radius near NYC), so map markers are capped to the
+// nearest N. The results list is cheaper per item (no maplibre marker/
+// popup overhead) so it gets a higher cap, just to guard the pathological
+// case of a huge radius over the densest part of the state.
+const MAX_MAP_MARKERS = 300;
+const MAX_LIST_RESULTS = 1000;
 
 let allMeetings = []; // [{...properties, lat, lon}]
 let userLocation = null; // {lat, lon}
@@ -48,16 +55,21 @@ function minutesUntilNext(meeting, now) {
 
 async function loadMeetings() {
   setStatus("Loading meeting data…");
-  const res = await fetch(DATA_URL);
-  const geojson = await res.json();
-  allMeetings = geojson.features
-    .filter((f) => f.geometry)
-    .map((f) => ({
-      ...f.properties,
-      lon: f.geometry.coordinates[0],
-      lat: f.geometry.coordinates[1],
-    }));
-  setStatus(`${allMeetings.length} meetings loaded. Enter your location to search.`);
+  try {
+    const res = await fetch(DATA_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const geojson = await res.json();
+    allMeetings = geojson.features
+      .filter((f) => f.geometry)
+      .map((f) => ({
+        ...f.properties,
+        lon: f.geometry.coordinates[0],
+        lat: f.geometry.coordinates[1],
+      }));
+    setStatus(`${allMeetings.length} meetings loaded. Enter your location to search.`);
+  } catch (err) {
+    setStatus("Couldn't load meeting data. Try refreshing the page in a bit.", true);
+  }
 }
 
 async function geocode(query) {
@@ -91,6 +103,7 @@ async function runSearch() {
     return;
   }
   el("search-btn").disabled = true;
+  setStatus("Searching…");
   try {
     if (query && query !== "Current location") {
       setStatus("Looking up location…");
@@ -105,6 +118,11 @@ async function runSearch() {
     let results = allMeetings
       .map((m) => ({ ...m, distance: haversineMiles(userLocation.lat, userLocation.lon, m.lat, m.lon) }))
       .filter((m) => m.distance <= radius);
+
+    // By-appointment meetings (no fixed day/time) never match a "today" or
+    // "this week" filter — count them so the empty-looking result isn't
+    // mistaken for there being no nearby meetings at all.
+    const unscheduledCount = results.filter((m) => m.day === null || m.day === undefined).length;
 
     if (when === "today" || when === "upcoming-today") {
       results = results.filter((m) => m.day === now.getDay());
@@ -126,7 +144,18 @@ async function runSearch() {
 
     renderResults(results);
     renderMap(results);
-    setStatus(`${results.length} meeting(s) found within ${radius} miles.`);
+
+    const notes = [];
+    if (results.length > MAX_LIST_RESULTS) {
+      notes.push(`showing the nearest ${MAX_LIST_RESULTS}`);
+    } else if (results.length > MAX_MAP_MARKERS) {
+      notes.push(`showing the nearest ${MAX_MAP_MARKERS} on the map`);
+    }
+    if ((when === "today" || when === "upcoming-today") && unscheduledCount > 0) {
+      notes.push(`${unscheduledCount} by-appointment meeting(s) nearby not shown — search "Any time" to see them`);
+    }
+    const suffix = notes.length ? ` (${notes.join("; ")})` : "";
+    setStatus(`${results.length} meeting(s) found within ${radius} miles.${suffix}`);
   } catch (err) {
     setStatus(err.message || "Search failed.", true);
   } finally {
@@ -148,7 +177,7 @@ function renderResults(results) {
     resultsList.innerHTML = `<li id="empty-state">No meetings match this search. Try a wider radius or a broader time range.</li>`;
     return;
   }
-  results.forEach((m) => {
+  results.slice(0, MAX_LIST_RESULTS).forEach((m) => {
     const li = document.createElement("li");
     li.className = "result-item";
     li.innerHTML = `
@@ -217,7 +246,7 @@ function setUserMarker(lat, lon) {
 
 function renderMap(results) {
   clearResultMarkers();
-  results.forEach(addResultMarker);
+  results.slice(0, MAX_MAP_MARKERS).forEach(addResultMarker);
   if (userLocation) {
     setUserMarker(userLocation.lat, userLocation.lon);
     map.flyTo({ center: [userLocation.lon, userLocation.lat], zoom: 11 });
