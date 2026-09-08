@@ -1,8 +1,8 @@
 # AA Meeting Finder (NY Pilot) — Status
 
-**Repo:** https://github.com/Cazzaster/aa-map (currently **private** — flip to public when ready, then enable Pages)
-**Last session:** September 5, 2026
-**Live preview:** none yet — Pages not enabled while repo is private
+**Repo:** https://github.com/Cazzaster/aa-map (**public**, Pages enabled)
+**Last session:** September 7, 2026
+**Live:** https://cazzaster.github.io/aa-map/
 
 ## What this is
 
@@ -14,13 +14,14 @@ a static MapLibre frontend reads directly.
 
 ## Current state (all done this session)
 
-- [x] Source registry (`sources/ny_sources.yaml`): **7 verified** NY
-      Area/Intergroup TSML feeds (~4,700 in-person/hybrid meetings after
-      filtering out online-only/inactive), **2 known-restricted**
-      (Buffalo, Rockland — feed exists but returns `feed_restricted`, a
-      deliberate site-owner choice, don't bypass), **4 needing manual
-      follow-up** (Rochester — WAF-blocked, likely TSML; Westchester;
-      Binghamton; Elmira)
+- [x] Source registry (`sources/ny_sources.yaml`): **8 verified** NY
+      Area/Intergroup feeds (~4,900 in-person/hybrid meetings after
+      filtering out online-only/inactive), **Westchester already covered**
+      by the existing NYC feed (no separate source needed), **2
+      known-restricted** (Buffalo, Rockland — feed exists but returns
+      `feed_restricted`, a deliberate site-owner choice, don't bypass),
+      **2 remaining gaps** (Binghamton, Elmira — small hand-maintained
+      sites with no structured feed at all)
 - [x] Normalizer + build pipeline (`scripts/`) — tested end-to-end against
       the real feeds, produces `docs/data/meetings.geojson`
 - [x] Static MapLibre frontend (`docs/`) — address/ZIP or geolocation
@@ -112,13 +113,54 @@ safe ones:
   to see them."
 
 Not done (need more time/research or your decision, not code changes):
-Rochester/Westchester/Binghamton/Elmira feed research, emailing
-Buffalo/Rockland intergroups, and nightly-build failure monitoring
-(GitHub already emails repo owners on failed Actions runs by default, so
-this is likely a non-issue as long as those notifications are on).
+emailing Buffalo/Rockland intergroups, and nightly-build failure
+monitoring (GitHub already emails repo owners on failed Actions runs by
+default, so this is likely a non-issue as long as those notifications
+are on).
 
 All of the above, plus the 6 code-review fixes and the privacy fixes, are
 committed and pushed to `main`.
+
+## New coverage: Rochester added, Westchester was already covered
+
+You asked what geographic areas could still be added. Investigated all
+four open regions:
+
+- **Rochester — added.** `/wp-json/tsml/meetings` is disabled outright
+  (404, not a permissions block), but the human-facing meeting-finder
+  page (`?post_type=tsml_meeting&tsml-day=N`) embeds the full dataset —
+  name/time/day/types plus location name/address/lat/lon, and unlike
+  every JSON feed, **no free-text notes field at all** — as a
+  `var locations = {...}` JS blob, one weekday per request. The earlier
+  "WAF-blocked" finding turned out to be a burst-rate rule, not a hard
+  block: a single isolated request succeeds fine. New
+  `scripts/normalize/rochester.py` fetches all 7 days, 3 seconds apart
+  (once a night — nowhere near burst territory), extracts that blob, and
+  filters out the "Online" placeholder location the same way the other
+  feeds filter `attendance_option: online`. Added **319 meetings**,
+  confirmed live in the browser (Rochester search: 106 meetings within 5
+  miles) and via a real build run with zero errors.
+- **Westchester — no work needed.** westchesternyaa.org has no feed of
+  its own; its own "Westchester Meetings" button links straight to
+  `nyintergroup.org/meetings/?region=westchester-county` — the *same*
+  feed already registered as `ny_intergroup_nyc`, which we already pull
+  in full. Confirmed ~130 meetings in the dataset already match
+  Westchester towns (White Plains, Yonkers, New Rochelle, etc). Updated
+  the registry notes to record this so nobody re-investigates it later.
+- **Binghamton and Elmira — still gaps, deprioritized.** Both are small,
+  hand-maintained sites with meeting times written as prose in a normal
+  HTML page (Binghamton) or behind ordinary site navigation with no
+  feed we could find in a quick pass (Elmira) — no TSML/BMLT/JSON
+  anywhere. Scraping either would mean parsing free-text layout that
+  breaks the moment the site gets redesigned, for a much smaller area
+  than Rochester. Lowest priority of what's left; a direct email asking
+  for a data export is probably more durable than a scraper here.
+
+Also added: a shared `scripts/normalize/timeparse.py` (extracted from
+the Meeting Guide parser, now also handles "Noon"/"Midnight" literals
+which Rochester's feed uses), plus tests for both new modules (9 more
+tests, 25 total). Full rebuild verified clean: 4,902 meetings, zero PII
+matches on a full rescan, all tests passing.
 
 ## Key decisions made this session
 
@@ -138,10 +180,12 @@ committed and pushed to `main`.
 - [x] Privacy audit: scrub personal info from notes field + rewrite git
       history to remove it retroactively — done, committed, pushed
 - [x] Tests + a few frontend UX improvements — done, committed, pushed
-- [ ] Flip repo to public + enable GitHub Pages (`main:/docs`) once ready
-      — I can do this via the GitHub API once told to proceed
-- [ ] Chase down remaining NY regions: Rochester, Westchester, Binghamton,
-      Elmira
+- [x] Flip repo to public + enable GitHub Pages — done, live at
+      https://cazzaster.github.io/aa-map/
+- [x] Rochester feed added, Westchester confirmed already covered —
+      done, committed, pushed
+- [ ] Binghamton, Elmira: no structured feed found; would need a custom
+      scraper (fragile) or a direct data-export request — deprioritized
 - [ ] Consider emailing Buffalo/Rockland intergroups directly about
       getting their restricted feeds included
 

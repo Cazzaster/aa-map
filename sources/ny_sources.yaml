@@ -11,21 +11,21 @@
 # guess — it 404s everywhere). Confirm any new source the same way:
 #   curl -s <site>/wp-json/tsml/meetings | wc -c   (should return a JSON array)
 #
-# SUMMARY (as of this research pass):
+# SUMMARY (updated 2026-09-07):
 #   9 entities registered
-#   7 verified working feeds  (NYC, Queens, Nassau, Suffolk, Albany,
-#                               Syracuse, Jefferson County/North Country)
-#     ~6,369 meetings reachable across those 7 feeds combined
+#   8 verified working feeds (NYC, Queens, Nassau, Suffolk, Albany,
+#                              Syracuse, Jefferson County/North Country,
+#                              Rochester)
+#   Westchester needs no separate feed — already covered by the NYC
+#     Intergroup feed above (westchesternyaa.org links straight to it).
 #   2 feeds exist but are access-restricted by the site owner
 #     (Buffalo, Rockland) — see notes; do not attempt to bypass this,
 #     it's a deliberate choice by the intergroup, not a bug.
 #   Still needing manual follow-up / not yet found:
-#     Rochester/Genesee region (likely TSML, blocked by a WAF from
-#       automated fetches — try again with a real browser session, or
-#       email the intergroup to ask about API/feed access)
-#     Westchester (no discoverable feed at the obvious path)
-#     Southern Tier: Binghamton, Elmira (small sites, no TSML/BMLT found;
-#       likely need custom HTML scraping or a direct ask for a data export)
+#     Southern Tier: Binghamton, Elmira (small hand-maintained HTML sites,
+#       no TSML/BMLT/JSON of any kind; would need a bespoke scraper for
+#       unstructured prose-style listings, fragile and easily broken by a
+#       future page redesign — lowest priority of what's left)
 #   No BMLT-based AA source was found for NY in this pass — BMLT is far
 #   more common for NA than AA; none of the sites checked use it.
 
@@ -115,10 +115,10 @@ sources:
     name: "Rochester Area Intergroup"
     region: "Genesee, Livingston, Monroe, Ontario, Orleans, Wayne, Wyoming counties"
     website: "https://rochesteraa.org/"
-    feed_type: none_found
-    feed_url: null
-    verified: false
-    notes: "Meeting finder lives at meetings.rochesteraa.org (URL pattern ?post_type=tsml_meeting strongly suggests TSML), but automated requests to that subdomain are blocked by a ModSecurity WAF rule (got a 406/404 depending on headers, never real JSON). Main rochesteraa.org is on Squarespace and has no feed itself. Needs either a real browser session to probe further, or a direct ask to the intergroup for feed/API access."
+    feed_type: rochester_html
+    feed_url: "https://meetings.rochesteraa.org/"
+    verified: true
+    notes: "Runs TSML, but /wp-json/tsml/meetings is disabled (plain 404, not a WAF block) -- the REST API itself is off, not just rate-limited. The day-filtered archive page (?post_type=tsml_meeting&tsml-day=N) still embeds full meeting data (name/time/day/types + location name/address/lat/lon, no notes field at all) in a `var locations = {...}` JS blob. scripts/normalize/rochester.py fetches all 7 days (one request each, 3s apart) and extracts that blob directly -- confirmed a single isolated request succeeds; the earlier '406/404, WAF-blocked' finding was from firing several requests back-to-back, which trips a burst-rate rule. One request per day, once a night, doesn't hit it."
 
   - id: westchester_aa
     name: "Westchester AA (Westchester General Service Assembly)"
@@ -127,7 +127,7 @@ sources:
     feed_type: none_found
     feed_url: null
     verified: false
-    notes: "No TSML/Meeting Guide feed found at the standard path (redirects to homepage, so likely not running TSML at all, or it's on a different path/CMS). Needs manual investigation of the site's actual meeting-finder implementation."
+    notes: "westchesternyaa.org has no feed of its own -- its own 'Westchester Meetings' button links straight to nyintergroup.org/meetings/?region=westchester-county, i.e. the SAME New York Intergroup Association feed already registered above as ny_intergroup_nyc. We already pull that feed in full (unfiltered by region), so Westchester County meetings are already in the dataset -- confirmed ~130 meetings in the current build whose address matches Westchester towns (White Plains, Yonkers, New Rochelle, etc). No new source needed here; this entry is kept only as a record of why there's no separate westchester_aa feed."
 
   - id: binghamton_intergroup
     name: "AA Binghamton (Triple Cities Intergroup)"

@@ -10,10 +10,11 @@ Spec reference: https://github.com/code4recovery/spec
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date
 
 from .sanitize import sanitize_notes
 from .schema import Meeting
+from .timeparse import parse_time
 
 # Meeting Guide spec sometimes uses "day" as a 0-6 int already matching our
 # convention (Sunday=0); some older TSML installs emit weekday names instead.
@@ -49,19 +50,6 @@ def _parse_day(raw) -> int | None:
     return None
 
 
-def _parse_time(raw: str | None) -> str | None:
-    if not raw:
-        return None
-    raw = raw.strip()
-    # Spec allows "HH:MM" already; some feeds emit "H:MM AM/PM".
-    for fmt in ("%H:%M", "%I:%M %p", "%I:%M%p"):
-        try:
-            return datetime.strptime(raw, fmt).strftime("%H:%M")
-        except ValueError:
-            continue
-    return None  # unparseable — treat as unscheduled rather than showing garbage
-
-
 def parse(raw_meetings: list[dict], source_id: str) -> list[Meeting]:
     today = date.today().isoformat()
     out = []
@@ -86,8 +74,8 @@ def parse(raw_meetings: list[dict], source_id: str) -> list[Meeting]:
             source_id=source_id,
             name=m.get("name") or m.get("group") or "Unnamed Meeting",
             day=_parse_day(m.get("day")),
-            time=_parse_time(m.get("time")),
-            end_time=_parse_time(m.get("end_time")),
+            time=parse_time(m.get("time")),
+            end_time=parse_time(m.get("end_time")),
             types=types,
             location_name=m.get("location"),
             address=m.get("formatted_address") or m.get("address"),

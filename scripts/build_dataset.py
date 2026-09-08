@@ -18,11 +18,19 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from geocode import geocode_missing
 from normalize import PARSERS
+from normalize import rochester
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES_PATH = ROOT / "sources" / "ny_sources.yaml"
 OUTPUT_PATH = ROOT / "docs" / "data" / "meetings.geojson"  # docs/ is the GitHub Pages root
 _HEADERS = {"User-Agent": "aa-map/0.1 (public-service meeting finder)"}
+
+# Sources whose data can't be fetched as one JSON GET + generic parse (e.g.
+# Rochester needs 7 day-scoped HTML page fetches). These own their fetching
+# entirely and just hand back finished Meeting objects.
+SELF_FETCHING = {
+    "rochester_html": rochester.fetch_meetings,
+}
 
 
 def load_sources() -> list[dict]:
@@ -75,15 +83,19 @@ def main() -> None:
     for src in sources:
         feed_type = src.get("feed_type")
         feed_url = src.get("feed_url")
+        self_fetch = SELF_FETCHING.get(feed_type)
         parser = PARSERS.get(feed_type)
 
-        if not parser or not feed_url:
+        if not (self_fetch or parser) or not feed_url:
             skipped.append((src["id"], "no verified feed — needs custom scraping"))
             continue
 
         try:
-            raw = fetch_feed(feed_url)
-            meetings = parser(raw, source_id=src["id"])
+            if self_fetch:
+                meetings = self_fetch(src["id"], feed_url)
+            else:
+                raw = fetch_feed(feed_url)
+                meetings = parser(raw, source_id=src["id"])
         except Exception as exc:  # noqa: BLE001 — one bad source shouldn't kill the build
             skipped.append((src["id"], f"fetch/parse failed: {exc}"))
             continue

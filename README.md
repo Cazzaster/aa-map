@@ -51,18 +51,24 @@ anonymity tradition.
 
 As of this pilot's initial research (see `sources/ny_sources.yaml` for full detail):
 
-- **7 verified, working feeds**: NYC (New York Intergroup), Queens, Nassau
-  County, Suffolk County, Capital District/Albany, Syracuse, and Jefferson
-  County/North Country — roughly **4,700 in-person/hybrid meetings** after
-  filtering out online-only and inactive listings.
+- **8 verified, working feeds**: NYC (New York Intergroup), Queens, Nassau
+  County, Suffolk County, Capital District/Albany, Syracuse, Jefferson
+  County/North Country, and Rochester — roughly **4,900 in-person/hybrid
+  meetings** after filtering out online-only and inactive listings.
+  Rochester's REST API is disabled, so its meetings come from
+  `scripts/normalize/rochester.py`, which reads the same data out of the
+  site's own day-filtered HTML pages instead.
+- **Westchester County is already covered** — westchesternyaa.org has no
+  feed of its own; its "Find a Meeting" link points straight at the NYC
+  Intergroup feed above, which we already pull in full.
 - **2 feeds exist but are access-restricted** by the site owner (Buffalo,
   Rockland County) — both return an explicit `feed_restricted` response.
   This is a deliberate choice by those intergroups, not a bug; don't try to
   bypass it. Contact the intergroup directly to ask about inclusion.
-- **Not yet found / needs manual follow-up**: Rochester (likely runs TSML,
-  but its meeting-finder subdomain is behind a WAF that blocks automated
-  fetches), Westchester, Binghamton, and Elmira (Southern Tier — small sites
-  with no discoverable feed, likely need custom HTML scraping).
+- **Not yet found / needs manual follow-up**: Binghamton and Elmira
+  (Southern Tier — small hand-maintained sites with no TSML/BMLT/JSON of
+  any kind, just unstructured prose-style HTML; would need a bespoke,
+  fragile scraper).
 - No BMLT-based AA source was found for NY — BMLT is far more common for NA.
 
 ## Adding a new NY source
